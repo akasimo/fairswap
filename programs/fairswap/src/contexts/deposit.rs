@@ -12,13 +12,12 @@ use crate::assert_non_zero;
 use constant_product_curve::ConstantProduct;
 
 #[derive(Accounts)]
-#[instruction(seed: u64)]
 pub struct Deposit<'info> {
     #[account(mut)]
-    user: Signer<'info>,
+    pub user: Signer<'info>,
 
-    mint_x: InterfaceAccount<'info, Mint>,
-    mint_y: InterfaceAccount<'info, Mint>,
+    pub mint_x: InterfaceAccount<'info, Mint>,
+    pub mint_y: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -26,7 +25,7 @@ pub struct Deposit<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_x: InterfaceAccount<'info, TokenAccount>,
+    pub user_ata_x: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -34,7 +33,7 @@ pub struct Deposit<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_y: InterfaceAccount<'info, TokenAccount>,
+    pub user_ata_y: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         init_if_needed,
@@ -43,38 +42,38 @@ pub struct Deposit<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_lp: InterfaceAccount<'info, TokenAccount>,
+    pub user_ata_lp: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         associated_token::mint = mint_x,
         associated_token::authority = config,
         associated_token::token_program = token_program,
     )]
-    vault_x: InterfaceAccount<'info, TokenAccount>,
+    pub vault_x: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        associated_token::mint = mint_x,
+        associated_token::mint = mint_y,
         associated_token::authority = config,
         associated_token::token_program = token_program,
     )]
-    vault_y: InterfaceAccount<'info, TokenAccount>,
+    pub vault_y: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        seeds = [b"mint", config.key().as_ref()],
+        seeds = [b"mint_lp", config.key().as_ref()],
         bump = config.lp_bump,
         // mint::authority = config,
         // mint::decimals = 6,
         // mint::freeze_authority = config,
         // mint::token_program = token_program,
     )]
-    mint_lp: InterfaceAccount<'info, Mint>,
+    pub mint_lp: InterfaceAccount<'info, Mint>,
 
     #[account(
-        seeds = [b"amm".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), seed.to_le_bytes().as_ref()],
+        seeds = [b"config".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), config.seed.to_le_bytes().as_ref()],
         bump = config.bump,
     )]
-    config: Account<'info, Config>,
+    pub config: Account<'info, Config>,
 
     // #[account(
     //     mut,
@@ -83,13 +82,14 @@ pub struct Deposit<'info> {
     // )]
     // pooldata: Account<'info, PoolData>,
 
-    token_program: Interface<'info, TokenInterface>,
-    associated_token_program: Program<'info, AssociatedToken>,
-    system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 impl<'info> Deposit<'info> {
     pub fn deposit(&mut self, amount: u64, max_x: u64, max_y: u64) -> Result<()> {
+        msg!("Starting deposit");
         require!(!self.config.locked, AmmError::PoolLocked);
         assert_non_zero!([amount, max_x, max_y]);
         assert_not_locked!(self);
@@ -132,14 +132,22 @@ impl<'info> Deposit<'info> {
         //     // x vault:100, y: 10 => x fiyatı: x/y = 100/10 = 10. bu en kötü fiyat. yani x alırken 10dan fazla alamayacak
         // }
 
+        msg!("Checking slippage");
         require!(x <= max_x && y <= max_y, AmmError::SlippageExceeded);
 
+        msg!("Depositing token x");
         self.deposit_tokens(true, x)?;
+
+        msg!("Depositing token y");
         self.deposit_tokens(false, y)?;
+
+        msg!("Minting LP tokens");
         self.mint_lp_token(amount)
     }
 
     pub fn deposit_tokens(&mut self, is_x: bool, amount: u64) -> Result<()> {
+        msg!("deposit tokens func started");
+        // let decimals: u8 = 6;
         let (mint, decimals, vault, ata) = match is_x {
             true => (
                 self.mint_x.to_account_info(),
@@ -154,7 +162,7 @@ impl<'info> Deposit<'info> {
                 self.user_ata_y.to_account_info(),
             ),
         };
-
+        msg!("Creating transfer checked accounts");
         let accounts = TransferChecked {
             from: ata,
             to: vault,
@@ -163,7 +171,7 @@ impl<'info> Deposit<'info> {
         };
 
         let ctx = CpiContext::new(self.token_program.to_account_info(), accounts);
-
+        msg!("Transferring tokens");
         transfer_checked(ctx, amount, decimals)?;
 
         Ok(())

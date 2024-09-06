@@ -12,10 +12,10 @@ use crate::states::{Config, PoolData};
 #[instruction(seed: u64)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    admin: Signer<'info>,
+    pub admin: Signer<'info>,
 
-    mint_x: InterfaceAccount<'info, Mint>,
-    mint_y: InterfaceAccount<'info, Mint>,
+    pub mint_x: InterfaceAccount<'info, Mint>,
+    pub mint_y: InterfaceAccount<'info, Mint>,
 
     // /// CHECK: This account is only used to sign. it doesn't contain SOL
     // #[account(seeds = [b"auth"], bump)]
@@ -24,10 +24,10 @@ pub struct Initialize<'info> {
         init,
         payer = admin,
         space = 8 + Config::INIT_SPACE,
-        seeds = [b"amm".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), seed.to_le_bytes().as_ref()],
+        seeds = [b"config".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump
     )]
-    config: Box<Account<'info, Config>>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         init,
@@ -36,19 +36,19 @@ pub struct Initialize<'info> {
         seeds = [b"pooldata", config.key().as_ref()],
         bump
     )]
-    pooldata: Box<Account<'info, PoolData>>,
+    pub pooldata: Box<Account<'info, PoolData>>,
 
     #[account(
         init_if_needed,
         payer = admin,
-        seeds = [b"mint", config.key().as_ref()],
+        seeds = [b"mint_lp", config.key().as_ref()],
         bump,
         mint::authority = config,
         mint::decimals = 6,
         mint::freeze_authority = config,
         mint::token_program = token_program,
     )]
-    mint_lp: Box<InterfaceAccount<'info, Mint>>,
+    pub mint_lp: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         init_if_needed,
@@ -57,7 +57,7 @@ pub struct Initialize<'info> {
         associated_token::authority = config,
         // associated_token::token_program = token_program,
     )]
-    vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
@@ -66,11 +66,11 @@ pub struct Initialize<'info> {
         associated_token::authority = config,
         // associated_token::token_program = token_program,
     )]
-    vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    token_program: Interface<'info, TokenInterface>,
-    associated_token_program: Program<'info, AssociatedToken>,
-    system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 impl<'info> Initialize<'info> {

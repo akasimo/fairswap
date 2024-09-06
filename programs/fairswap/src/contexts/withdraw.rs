@@ -11,13 +11,12 @@ use crate::assert_non_zero;
 use constant_product_curve::ConstantProduct;
 
 #[derive(Accounts)]
-#[instruction(seed: u64)]
 pub struct Withdraw<'info> {
     #[account(mut)]
-    user: Signer<'info>,
+    pub user: Signer<'info>,
 
-    mint_x: InterfaceAccount<'info, Mint>,
-    mint_y: InterfaceAccount<'info, Mint>,
+    pub mint_x: InterfaceAccount<'info, Mint>,
+    pub mint_y: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -25,7 +24,7 @@ pub struct Withdraw<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_x: InterfaceAccount<'info, TokenAccount>,
+    pub user_ata_x: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -33,7 +32,7 @@ pub struct Withdraw<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_y: InterfaceAccount<'info, TokenAccount>,
+    pub user_ata_y: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -41,40 +40,40 @@ pub struct Withdraw<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_lp: InterfaceAccount<'info, TokenAccount>,
+    pub user_ata_lp: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         associated_token::mint = mint_x,
         associated_token::authority = config,
         associated_token::token_program = token_program,
     )]
-    vault_x: InterfaceAccount<'info, TokenAccount>,
+    pub vault_x: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         associated_token::mint = mint_x,
         associated_token::authority = config,
         associated_token::token_program = token_program,
     )]
-    vault_y: InterfaceAccount<'info, TokenAccount>,
+    pub vault_y: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        seeds = [b"mint", config.key().as_ref()],
+        seeds = [b"mint_lp", config.key().as_ref()],
         bump = config.lp_bump,
     )]
-    mint_lp: InterfaceAccount<'info, Mint>,
+    pub mint_lp: InterfaceAccount<'info, Mint>,
 
     #[account(
         has_one = mint_x,
         has_one = mint_y,
-        seeds = [b"amm".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), seed.to_le_bytes().as_ref()],
+        seeds = [b"config".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), config.seed.to_le_bytes().as_ref()],
         bump = config.bump,
     )]
-    config: Account<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    token_program: Interface<'info, TokenInterface>,
-    associated_token_program: Program<'info, AssociatedToken>,
-    system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 impl <'info> Withdraw<'info> {

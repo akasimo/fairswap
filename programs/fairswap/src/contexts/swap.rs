@@ -11,7 +11,6 @@ use crate::assert_non_zero;
 use constant_product_curve::{ConstantProduct, LiquidityPair};
 
 #[derive(Accounts)]
-#[instruction(seed: u64)]
 pub struct Swap<'info> {
     #[account(mut)]
     user: Signer<'info>,
@@ -63,7 +62,7 @@ pub struct Swap<'info> {
     #[account(
         has_one = mint_x,
         has_one = mint_y,
-        seeds = [b"amm".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), seed.to_le_bytes().as_ref()],
+        seeds = [b"config".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), config.seed.to_le_bytes().as_ref()],
         bump = config.bump,
     )]
     config: Box<Account<'info, Config>>,
