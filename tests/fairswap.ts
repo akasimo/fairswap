@@ -334,6 +334,37 @@ describe("fairswap", () => {
     console.log(`Current slot is ${currentSlot}`);
     await logBalances(initializer.publicKey, "swap Y for X", mint_x, mint_y);
   });
+
+
+  it("Withdraw", async () => {
+    const tx = await program.methods.withdraw(
+      new BN(20000),
+      new BN(20000),
+      new BN(30000)
+    )
+      .accountsStrict({
+        user: initializer.publicKey,
+        auth,
+        mintX: mint_x,
+        mintY: mint_y,
+        userAtaX: initializer_x_ata,
+        userAtaY: initializer_y_ata,
+        userAtaLp: initializer_lp_ata,
+        vaultX: vault_x_ata,
+        vaultY: vault_y_ata,
+        mintLp: mint_lp,
+        config,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
+    await confirmTx(tx);
+    console.log("Your withdraw transaction signature", tx);
+    await logBalances(initializer.publicKey, "withdraw", mint_x, mint_y);
+  });
 });
 
 // Helpers

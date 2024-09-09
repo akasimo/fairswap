@@ -50,6 +50,7 @@ pub struct Withdraw<'info> {
     pub user_ata_lp: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
+        mut,
         associated_token::mint = mint_x,
         associated_token::authority = auth,
         associated_token::token_program = token_program,
@@ -57,6 +58,7 @@ pub struct Withdraw<'info> {
     pub vault_x: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
+        mut,
         associated_token::mint = mint_y,
         associated_token::authority = auth,
         associated_token::token_program = token_program,
@@ -107,16 +109,18 @@ impl<'info> Withdraw<'info> {
     }
 
     pub fn withdraw_tokens(&mut self, is_x: bool, amount: u64) -> Result<()> {
-        let binding_mint_x = self.mint_x.to_account_info().key();
-        let binding_mint_y = self.mint_y.to_account_info().key();
-        let binding_seed = self.config.seed.to_le_bytes();
-        let seeds = &[
-            &b"amm"[..],
-            &binding_mint_x.as_ref(),
-            &binding_mint_y.as_ref(),
-            &binding_seed.as_ref(),
-            &[self.config.bump],
-        ];
+        // let binding_mint_x = self.mint_x.to_account_info().key();
+        // let binding_mint_y = self.mint_y.to_account_info().key();
+        // let binding_seed = self.config.seed.to_le_bytes();
+        // let seeds = &[
+        //     &b"amm"[..],
+        //     &binding_mint_x.as_ref(),
+        //     &binding_mint_y.as_ref(),
+        //     &binding_seed.as_ref(),
+        //     &[self.config.bump],
+        // ];
+        let seeds = &[&b"auth"[..], &[self.config.bump_auth]];
+
         let signer_seeds = &[&seeds[..]];
 
         let (mint, decimals, vault, ata) = match is_x {
@@ -137,7 +141,7 @@ impl<'info> Withdraw<'info> {
         let accounts = TransferChecked {
             from: vault,
             to: ata,
-            authority: self.config.to_account_info(),
+            authority: self.auth.to_account_info(),
             mint,
         };
 
