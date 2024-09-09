@@ -1,5 +1,5 @@
+use crate::constants::*;
 use anchor_lang::prelude::*;
-use  crate::constants::*;
 
 #[account]
 pub struct Config {
@@ -15,7 +15,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub const LEN: usize = 8 + U64_L + OPTION_L + PUBKEY_L*3 + U16_L + BOOL_L + U8_L*3;
+    pub const LEN: usize = 8 + U64_L + OPTION_L + PUBKEY_L * 3 + U16_L + BOOL_L + U8_L * 3;
 
     pub fn init(
         &mut self,
@@ -37,6 +37,5 @@ impl Config {
         self.auth_bump = auth_bump;
         self.config_bump = config_bump;
         // self.lp_bump = lp_bump;
-
     }
 }

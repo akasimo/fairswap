@@ -1,10 +1,10 @@
-use anchor_lang::prelude::*;
+use crate::error::AmmError;
 use crate::state::config::Config;
+use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{ Mint, TokenAccount, TokenInterface},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
-use crate::error::AmmError;
 
 #[derive(Accounts)]
 #[instruction(seed:u64)]
@@ -63,8 +63,16 @@ impl<'info> Initialize<'info> {
         fee: u16,
         authority: Option<Pubkey>,
     ) -> Result<()> {
-        require!(fee<=10000, AmmError::FeePercentErr);
-        self.config.init(seed, authority, self.mint_x.key(), self.mint_y.key(), fee, bumps.auth, bumps.config);
+        require!(fee <= 10000, AmmError::FeePercentErr);
+        self.config.init(
+            seed,
+            authority,
+            self.mint_x.key(),
+            self.mint_y.key(),
+            fee,
+            bumps.auth,
+            bumps.config,
+        );
         Ok(())
     }
 }
