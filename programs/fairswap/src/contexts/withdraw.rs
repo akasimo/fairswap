@@ -1,12 +1,12 @@
+use crate::assert_non_zero;
+use crate::errors::AmmError;
+use crate::{assert_not_locked, states::Config};
 use anchor_lang::prelude::*;
 use anchor_spl::{
-    associated_token::AssociatedToken, 
-    token::{TransferChecked, transfer_checked, Burn, burn}, 
-    token_interface::{ Mint, TokenAccount, TokenInterface}
+    associated_token::AssociatedToken,
+    token::{burn, transfer_checked, Burn, TransferChecked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
-use crate::{assert_not_locked, states::Config};
-use crate::errors::AmmError;
-use crate::assert_non_zero;
 
 use constant_product_curve::ConstantProduct;
 
@@ -83,15 +83,22 @@ pub struct Withdraw<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl <'info> Withdraw<'info> {
-    pub fn withdraw(&mut self, amount:u64, min_x: u64, min_y: u64) -> Result<()> {
+impl<'info> Withdraw<'info> {
+    pub fn withdraw(&mut self, amount: u64, min_x: u64, min_y: u64) -> Result<()> {
         require!(!self.config.locked, AmmError::PoolLocked);
         assert_non_zero!([amount, min_x, min_y]);
         assert_not_locked!(self.config.locked);
 
-        let amounts = ConstantProduct::xy_withdraw_amounts_from_l(self.vault_x.amount, self.vault_y.amount, self.mint_lp.supply, amount, 6).map_err(AmmError::from)?;
+        let amounts = ConstantProduct::xy_withdraw_amounts_from_l(
+            self.vault_x.amount,
+            self.vault_y.amount,
+            self.mint_lp.supply,
+            amount,
+            6,
+        )
+        .map_err(AmmError::from)?;
         let (x, y) = (amounts.x, amounts.y);
-        
+
         require!(x >= min_x && y >= min_y, AmmError::SlippageExceeded);
 
         self.withdraw_tokens(true, x)?;
@@ -100,7 +107,6 @@ impl <'info> Withdraw<'info> {
     }
 
     pub fn withdraw_tokens(&mut self, is_x: bool, amount: u64) -> Result<()> {
-
         let binding_mint_x = self.mint_x.to_account_info().key();
         let binding_mint_y = self.mint_y.to_account_info().key();
         let binding_seed = self.config.seed.to_le_bytes();
@@ -114,18 +120,32 @@ impl <'info> Withdraw<'info> {
         let signer_seeds = &[&seeds[..]];
 
         let (mint, decimals, vault, ata) = match is_x {
-            true => (self.mint_x.to_account_info(), self.mint_x.decimals, self.vault_x.to_account_info(), self.user_ata_x.to_account_info()),
-            false => (self.mint_y.to_account_info(), self.mint_y.decimals, self.vault_y.to_account_info(), self.user_ata_y.to_account_info()),
+            true => (
+                self.mint_x.to_account_info(),
+                self.mint_x.decimals,
+                self.vault_x.to_account_info(),
+                self.user_ata_x.to_account_info(),
+            ),
+            false => (
+                self.mint_y.to_account_info(),
+                self.mint_y.decimals,
+                self.vault_y.to_account_info(),
+                self.user_ata_y.to_account_info(),
+            ),
         };
 
         let accounts = TransferChecked {
             from: vault,
             to: ata,
             authority: self.config.to_account_info(),
-            mint: mint
+            mint,
         };
 
-        let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), accounts, signer_seeds);
+        let ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            accounts,
+            signer_seeds,
+        );
 
         transfer_checked(ctx, amount, decimals)?;
 
@@ -139,10 +159,7 @@ impl <'info> Withdraw<'info> {
             authority: self.user.to_account_info(),
         };
 
-        let ctx = CpiContext::new(
-            self.token_program.to_account_info(),
-            accounts
-        );
+        let ctx = CpiContext::new(self.token_program.to_account_info(), accounts);
 
         burn(ctx, amount)
     }

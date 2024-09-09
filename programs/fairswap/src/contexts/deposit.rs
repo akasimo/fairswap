@@ -41,7 +41,7 @@ pub struct Deposit<'info> {
         // associated_token::token_program = token_program,
     )]
     pub user_ata_y: Box<InterfaceAccount<'info, TokenAccount>>,
-    
+
     #[account(
         init_if_needed,
         seeds = [b"mint_lp", config.key().as_ref()],
@@ -206,10 +206,7 @@ impl<'info> Deposit<'info> {
         //     &binding_seed.as_ref(),
         //     &[self.config.bump],
         // ];
-        let seeds = &[
-            &b"auth"[..],
-            &[self.config.bump_auth],
-        ];
+        let seeds = &[&b"auth"[..], &[self.config.bump_auth]];
         let signer_seeds = &[&seeds[..]];
 
         let ctx = CpiContext::new_with_signer(

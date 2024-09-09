@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::Mint;
 
-use crate::states::Config;
 use crate::errors::AmmError;
+use crate::states::Config;
 
 #[derive(Accounts)]
 pub struct Update<'info> {
@@ -24,13 +24,19 @@ pub struct Update<'info> {
 
 impl<'info> Update<'info> {
     pub fn lock(&mut self) -> Result<()> {
-        require!(self.config.authority == self.admin.key(), AmmError::Unauthorized);
+        require!(
+            self.config.authority == self.admin.key(),
+            AmmError::Unauthorized
+        );
         self.config.locked = true;
         Ok(())
     }
 
     pub fn unlock(&mut self) -> Result<()> {
-        require!(self.config.authority == self.admin.key(), AmmError::Unauthorized);
+        require!(
+            self.config.authority == self.admin.key(),
+            AmmError::Unauthorized
+        );
         self.config.locked = false;
         Ok(())
     }

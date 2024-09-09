@@ -1,11 +1,11 @@
-use anchor_lang::prelude::*;
 use crate::errors::AmmError;
+use anchor_lang::prelude::*;
 
 #[macro_export]
 macro_rules! assert_non_zero {
     ($array:expr) => {
         if $array.contains(&0u64) {
-            return err!(AmmError::ZeroBalance)
+            return err!(AmmError::ZeroBalance);
         }
     };
 }
@@ -26,16 +26,18 @@ macro_rules! assert_has_authority {
 macro_rules! assert_not_locked {
     ($lock:expr) => {
         if $lock == true {
-            return err!(AmmError::PoolLocked)
+            return err!(AmmError::PoolLocked);
         }
     };
 }
 
-
-
 pub fn calculate_limit_price(amount1: u64, amount2: u64, precision: u8) -> Result<u128> {
     let result = (amount1 as u128)
-        .checked_mul(10u128.checked_pow(precision as u32).ok_or(AmmError::InvalidPrecision)?)
+        .checked_mul(
+            10u128
+                .checked_pow(precision as u32)
+                .ok_or(AmmError::InvalidPrecision)?,
+        )
         .ok_or(AmmError::Overflow)?
         .checked_div(amount2 as u128)
         .ok_or(AmmError::Overflow)?;

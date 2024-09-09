@@ -44,9 +44,9 @@ describe("fairswap", () => {
 
   it("Create mints, tokens and ATAs", async () => {
     // Create mints and ATAs
-    let [ u1, u2 ] = await Promise.all([initializer, initializer].map(async(a) => { return await newMintToAta(anchor.getProvider().connection, a, 1e6) }))
+    let [u1, u2] = await Promise.all([initializer, initializer].map(async (a) => { return await newMintToAta(anchor.getProvider().connection, a, 1e6) }))
     mint_x = u1.mint;
-    mint_y = u2.mint;   
+    mint_y = u2.mint;
     initializer_x_ata = u1.ata;
     initializer_y_ata = u2.ata;
 
@@ -88,34 +88,34 @@ describe("fairswap", () => {
       seed,
       0
     )
-    // .accounts({
-    //   admin: initializer.publicKey,
-    //   mintX: mint_x,
-    //   mintY: mint_y,
-    //   mintLp: mint_lp,
-    //   vaultX: vault_x_ata,
-    //   vaultY: vault_y_ata,
-    //   config,
-    //   tokenProgram: TOKEN_PROGRAM_ID,
-    //   associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-    //   systemProgram: SystemProgram.programId
-    // })
-    .accountsPartial({
-      admin: initializer.publicKey,
-      auth,
-      mintX: mint_x,
-      mintY: mint_y,
-      // mintLp: mint_lp,
-      vaultX: vault_x_ata,
-      vaultY: vault_y_ata,
-      config,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-      systemProgram: SystemProgram.programId
-    })
-    .signers([
-      initializer
-    ]).rpc();
+      // .accounts({
+      //   admin: initializer.publicKey,
+      //   mintX: mint_x,
+      //   mintY: mint_y,
+      //   mintLp: mint_lp,
+      //   vaultX: vault_x_ata,
+      //   vaultY: vault_y_ata,
+      //   config,
+      //   tokenProgram: TOKEN_PROGRAM_ID,
+      //   associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+      //   systemProgram: SystemProgram.programId
+      // })
+      .accountsPartial({
+        admin: initializer.publicKey,
+        auth,
+        mintX: mint_x,
+        mintY: mint_y,
+        // mintLp: mint_lp,
+        vaultX: vault_x_ata,
+        vaultY: vault_y_ata,
+        config,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
     await logBalances(initializer.publicKey, "initialization", mint_x, mint_y);
@@ -123,16 +123,16 @@ describe("fairswap", () => {
 
   it("Lock", async () => {
     const tx = await program.methods.lock()
-    .accountsPartial({
-      admin: initializer.publicKey,
-      mintX: mint_x,
-      mintY: mint_y,
-      config,
-      systemProgram: SystemProgram.programId
-    })
-    .signers([
-      initializer
-    ]).rpc();
+      .accountsPartial({
+        admin: initializer.publicKey,
+        mintX: mint_x,
+        mintY: mint_y,
+        config,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
   });
@@ -144,28 +144,28 @@ describe("fairswap", () => {
         new BN(20000),
         new BN(30000)
       )
-      .accountsStrict({
-        user: initializer.publicKey,
-        auth,
-        mintX: mint_x,
-        mintY: mint_y,
-        userAtaX: initializer_x_ata,
-        userAtaY: initializer_y_ata,
-        userAtaLp: initializer_lp_ata,
-        vaultX: vault_x_ata,
-        vaultY: vault_y_ata,
-        mintLp: mint_lp,
-        config,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([initializer])
-      .rpc();
-  
+        .accountsStrict({
+          user: initializer.publicKey,
+          auth,
+          mintX: mint_x,
+          mintY: mint_y,
+          userAtaX: initializer_x_ata,
+          userAtaY: initializer_y_ata,
+          userAtaLp: initializer_lp_ata,
+          vaultX: vault_x_ata,
+          vaultY: vault_y_ata,
+          mintLp: mint_lp,
+          config,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+          systemProgram: SystemProgram.programId
+        })
+        .signers([initializer])
+        .rpc();
+
       await confirmTx(tx);
       console.log("Your deposit transaction signature", tx);
-      
+
       // If we reach here, the transaction succeeded unexpectedly
       assert.fail("Deposit transaction should have failed due to lock, but it succeeded");
     } catch (e) {
@@ -183,16 +183,16 @@ describe("fairswap", () => {
 
   it("Unlock", async () => {
     const tx = await program.methods.unlock()
-    .accountsPartial({
-      admin: initializer.publicKey,
-      mintX: mint_x,
-      mintY: mint_y,
-      config,
-      systemProgram: SystemProgram.programId
-    })
-    .signers([
-      initializer
-    ]).rpc();
+      .accountsPartial({
+        admin: initializer.publicKey,
+        mintX: mint_x,
+        mintY: mint_y,
+        config,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
   });
@@ -200,21 +200,21 @@ describe("fairswap", () => {
   it("Fail to lock", async () => {
     try {
       const tx = await program.methods.lock()
-      .accountsPartial({
-        admin: user1.publicKey,
-        mintX: mint_x,
-        mintY: mint_y,
-        config,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([
-        user1
-      ]).rpc();
+        .accountsPartial({
+          admin: user1.publicKey,
+          mintX: mint_x,
+          mintY: mint_y,
+          config,
+          systemProgram: SystemProgram.programId
+        })
+        .signers([
+          user1
+        ]).rpc();
       console.log("Your transaction signature", tx);
       assert.fail("Transaction should have failed but succeeded");
-    } catch(e) {
+    } catch (e) {
       let err = e as anchor.AnchorError;
-      if(err.error.errorCode.code !== "Unauthorized") {
+      if (err.error.errorCode.code !== "Unauthorized") {
         throw (e)
       }
     }
@@ -223,22 +223,22 @@ describe("fairswap", () => {
   it("Fail to unlock", async () => {
     try {
       const tx = await program.methods.unlock()
-      .accountsPartial({
-        admin: user2.publicKey,
-        mintX: mint_x,
-        mintY: mint_y,
-        config,
-        systemProgram: SystemProgram.programId
-      })
-      .signers([
-        user2
-      ]).rpc();
+        .accountsPartial({
+          admin: user2.publicKey,
+          mintX: mint_x,
+          mintY: mint_y,
+          config,
+          systemProgram: SystemProgram.programId
+        })
+        .signers([
+          user2
+        ]).rpc();
       console.log("Your transaction signature", tx);
 
       assert.fail("Transaction should have failed but succeeded");
-    } catch(e) {
+    } catch (e) {
       let err = e as anchor.AnchorError;
-      if(err.error.errorCode.code !== "Unauthorized") {
+      if (err.error.errorCode.code !== "Unauthorized") {
         throw (e)
       }
     }
@@ -250,25 +250,25 @@ describe("fairswap", () => {
       new BN(20000),
       new BN(30000)
     )
-    .accountsStrict({
-      user: initializer.publicKey,
-      auth,
-      mintX: mint_x,
-      mintY: mint_y,
-      userAtaX: initializer_x_ata,
-      userAtaY: initializer_y_ata,
-      userAtaLp: initializer_lp_ata,
-      vaultX: vault_x_ata,
-      vaultY: vault_y_ata,
-      mintLp: mint_lp,
-      config,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-      systemProgram: SystemProgram.programId
-    })
-    .signers([
-      initializer
-    ]).rpc();
+      .accountsStrict({
+        user: initializer.publicKey,
+        auth,
+        mintX: mint_x,
+        mintY: mint_y,
+        userAtaX: initializer_x_ata,
+        userAtaY: initializer_y_ata,
+        userAtaLp: initializer_lp_ata,
+        vaultX: vault_x_ata,
+        vaultY: vault_y_ata,
+        mintLp: mint_lp,
+        config,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
     await confirmTx(tx);
     console.log("Your deposit transaction signature", tx);
     await logBalances(initializer.publicKey, "deposit", mint_x, mint_y);
@@ -280,23 +280,23 @@ describe("fairswap", () => {
       new BN(5000),
       new BN(6000)
     )
-    .accountsPartial({
-      auth,
-      user: initializer.publicKey,
-      mintX: mint_x,
-      mintY: mint_y,
-      userAtaX: initializer_x_ata,
-      userAtaY: initializer_y_ata,
-      vaultX: vault_x_ata,
-      vaultY: vault_y_ata,
-      config,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-      systemProgram: SystemProgram.programId
-    })
-    .signers([
-      initializer
-    ]).rpc();
+      .accountsPartial({
+        auth,
+        user: initializer.publicKey,
+        mintX: mint_x,
+        mintY: mint_y,
+        userAtaX: initializer_x_ata,
+        userAtaY: initializer_y_ata,
+        vaultX: vault_x_ata,
+        vaultY: vault_y_ata,
+        config,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
     const currentSlot = await anchor.getProvider().connection.getSlot();
@@ -311,23 +311,23 @@ describe("fairswap", () => {
       new BN(6000),
       new BN(3000)
     )
-    .accountsPartial({
-      auth,
-      user: initializer.publicKey,
-      mintX: mint_x,
-      mintY: mint_y,
-      userAtaX: initializer_x_ata,
-      userAtaY: initializer_y_ata,
-      vaultX: vault_x_ata,
-      vaultY: vault_y_ata,
-      config,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-      systemProgram: SystemProgram.programId
-    })
-    .signers([
-      initializer
-    ]).rpc();
+      .accountsPartial({
+        auth,
+        user: initializer.publicKey,
+        mintX: mint_x,
+        mintY: mint_y,
+        userAtaX: initializer_x_ata,
+        userAtaY: initializer_y_ata,
+        vaultX: vault_x_ata,
+        vaultY: vault_y_ata,
+        config,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([
+        initializer
+      ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
     const currentSlot = await anchor.getProvider().connection.getSlot();
@@ -352,7 +352,7 @@ const confirmTxs = async (signatures: string[]) => {
   await Promise.all(signatures.map(confirmTx))
 }
 
-const newMintToAta = async (connection, minter: Keypair, amount): Promise<{ mint: PublicKey, ata: PublicKey }> => { 
+const newMintToAta = async (connection, minter: Keypair, amount): Promise<{ mint: PublicKey, ata: PublicKey }> => {
   const mint = await createMint(connection, minter, minter.publicKey, null, 6)
   // await getAccount(connection, mint, commitment)
   const ata = await createAccount(connection, minter, mint, minter.publicKey)

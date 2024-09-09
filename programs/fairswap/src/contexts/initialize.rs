@@ -69,7 +69,6 @@ pub struct Initialize<'info> {
     //     mint::decimals = 6,
     // )]
     // pub mint_lp: Box<InterfaceAccount<'info, Mint>>,
-
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -87,7 +86,7 @@ impl<'info> Initialize<'info> {
             mint_y: self.mint_y.key(),
             // bump_lp: bumps.mint_lp,
             bump: bumps.config,
-            bump_auth: bumps.auth
+            bump_auth: bumps.auth,
         });
         self.pooldata.set_inner(PoolData {
             last_slot: 0,
