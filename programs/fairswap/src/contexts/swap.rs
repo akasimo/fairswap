@@ -13,10 +13,17 @@ use constant_product_curve::{ConstantProduct, LiquidityPair};
 #[derive(Accounts)]
 pub struct Swap<'info> {
     #[account(mut)]
-    user: Signer<'info>,
+    pub user: Signer<'info>,
 
-    mint_x: Box<InterfaceAccount<'info, Mint>>,
-    mint_y: Box<InterfaceAccount<'info, Mint>>,
+    pub mint_x: Box<InterfaceAccount<'info, Mint>>,
+    pub mint_y: Box<InterfaceAccount<'info, Mint>>,
+
+    /// CHECK: this is safe
+    #[account(
+        seeds = [b"auth"],
+        bump = config.bump_auth,
+    )]
+    pub auth: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,
@@ -25,7 +32,7 @@ pub struct Swap<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_x: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub user_ata_x: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
@@ -34,30 +41,30 @@ pub struct Swap<'info> {
         associated_token::authority = user,
         associated_token::token_program = token_program,
     )]
-    user_ata_y: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub user_ata_y: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::authority = auth,
         associated_token::token_program = token_program,
     )]
-    vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
-        associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::mint = mint_y,
+        associated_token::authority = auth,
         associated_token::token_program = token_program,
     )]
-    vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
-        seeds = [b"mint", config.key().as_ref()],
-        bump = config.lp_bump,
+        seeds = [b"mint_lp", config.key().as_ref()],
+        bump,
     )]
-    mint_lp: Box<InterfaceAccount<'info, Mint>>,
+    pub mint_lp: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         has_one = mint_x,
@@ -65,23 +72,23 @@ pub struct Swap<'info> {
         seeds = [b"config".as_ref(), mint_x.key().as_ref(), mint_y.key().as_ref(), config.seed.to_le_bytes().as_ref()],
         bump = config.bump,
     )]
-    config: Box<Account<'info, Config>>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
         seeds = [b"pooldata", config.key().as_ref()],
         bump
     )]
-    pooldata: Box<Account<'info, PoolData>>,
+    pub pooldata: Box<Account<'info, PoolData>>,
 
-    token_program: Interface<'info, TokenInterface>,
-    associated_token_program: Program<'info, AssociatedToken>,
-    system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 impl <'info> Swap<'info> {
     pub fn swap(&mut self, mint_deposit:Pubkey, amount_in: u64, amount_out_min: u64) -> Result<()> {
-        assert_not_locked!(self);
+        assert_not_locked!(self.config.locked);
         assert_non_zero!([amount_in, amount_out_min]);
 
         let mut curve = ConstantProduct::init(
@@ -194,18 +201,23 @@ impl <'info> Swap<'info> {
             from,
             mint: mint.to_account_info(),
             to,
-            authority: self.config.to_account_info()
+            authority: self.auth.to_account_info()
+            // authority: self.config.to_account_info()
         };
 
-        let binding_mint_x = self.mint_x.to_account_info().key();
-        let binding_mint_y = self.mint_y.to_account_info().key();
-        let binding_seed = self.config.seed.to_le_bytes();
-        let seeds: &[&[u8]; 5] = &[
-            &b"amm"[..],
-            &binding_mint_x.as_ref(),
-            &binding_mint_y.as_ref(),
-            &binding_seed.as_ref(),
-            &[self.config.bump],
+        // let binding_mint_x = self.mint_x.to_account_info().key();
+        // let binding_mint_y = self.mint_y.to_account_info().key();
+        // let binding_seed = self.config.seed.to_le_bytes();
+        // let seeds: &[&[u8]; 5] = &[
+        //     &b"amm"[..],
+        //     &binding_mint_x.as_ref(),
+        //     &binding_mint_y.as_ref(),
+        //     &binding_seed.as_ref(),
+        //     &[self.config.bump],
+        // ];
+        let seeds = &[
+            &b"auth"[..],
+            &[self.config.bump_auth],
         ];
         let signer_seeds = &[&seeds[..]];
 

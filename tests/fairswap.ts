@@ -4,9 +4,9 @@ import { Fairswap } from "../target/types/fairswap";
 
 import { ConstantProduct, LiquidityPair } from "constant-product-curve-wasm";
 import { PublicKey, Commitment, Keypair, SystemProgram } from "@solana/web3.js"
-import { ASSOCIATED_TOKEN_PROGRAM_ID as associatedTokenProgram, TOKEN_PROGRAM_ID as tokenProgram, createMint, createAccount, mintTo, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token"
+import { ASSOCIATED_TOKEN_PROGRAM_ID as associatedTokenProgram, TOKEN_PROGRAM_ID as tokenProgram, createMint, createAccount, mintTo, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token"
 import { randomBytes } from "crypto"
-import { assert } from "chai"
+import { assert, expect } from "chai"
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 
 const commitment: Commitment = "confirmed";
@@ -22,6 +22,7 @@ describe("fairswap", () => {
   // Random seed
   // const seed = new BN(randomBytes(8));
   const seed = new BN(randomBytes(8));
+  const auth = PublicKey.findProgramAddressSync([Buffer.from("auth")], program.programId)[0];
 
   let mint_x: PublicKey;
   let mint_y: PublicKey;
@@ -43,11 +44,23 @@ describe("fairswap", () => {
 
   it("Create mints, tokens and ATAs", async () => {
     // Create mints and ATAs
-    let [ u1, u2 ] = await Promise.all([initializer, initializer].map(async(a) => { return await newMintToAta(anchor.getProvider().connection, a) }))
+    let [ u1, u2 ] = await Promise.all([initializer, initializer].map(async(a) => { return await newMintToAta(anchor.getProvider().connection, a, 1e6) }))
     mint_x = u1.mint;
-    mint_y = u2.mint;
+    mint_y = u2.mint;   
     initializer_x_ata = u1.ata;
     initializer_y_ata = u2.ata;
+
+    // const user1_x_ata = await createAccount(anchor.getProvider().connection, initializer, mint_x, user1.publicKey);
+    // await mintTo(anchor.getProvider().connection, initializer, mint_x, user1_x_ata, user1, 10e7);
+
+    // const user1_y_ata = await createAccount(anchor.getProvider().connection, initializer, mint_y, user1.publicKey);
+    // await mintTo(anchor.getProvider().connection, initializer, mint_y, user1_y_ata, user1, 10e7);
+
+    // const user2_x_ata = await createAccount(anchor.getProvider().connection, initializer, mint_x, user2.publicKey);
+    // await mintTo(anchor.getProvider().connection, initializer, mint_x, user2_x_ata, user2, 10e7);
+
+    // const user2_y_ata = await createAccount(anchor.getProvider().connection, initializer, mint_y, user2.publicKey);
+    // await mintTo(anchor.getProvider().connection, initializer, mint_y, user2_y_ata, user2, 10e7);
 
     config = PublicKey.findProgramAddressSync([Buffer.from("config"), mint_x.toBuffer(), mint_y.toBuffer(), seed.toBuffer().reverse()], program.programId)[0];
 
@@ -55,9 +68,9 @@ describe("fairswap", () => {
 
     initializer_lp_ata = await getAssociatedTokenAddress(mint_lp, initializer.publicKey, false, tokenProgram);
     // Create take ATAs
-    vault_x_ata = await getAssociatedTokenAddress(mint_x, config, true, tokenProgram);
-    vault_y_ata = await getAssociatedTokenAddress(mint_y, config, true, tokenProgram);
-    vault_lp_ata = await getAssociatedTokenAddress(mint_lp, config, true, tokenProgram);
+    vault_x_ata = await getAssociatedTokenAddress(mint_x, auth, true, tokenProgram);
+    vault_y_ata = await getAssociatedTokenAddress(mint_y, auth, true, tokenProgram);
+    vault_lp_ata = await getAssociatedTokenAddress(mint_lp, auth, true, tokenProgram);
     // user_x_ata = await getAssociatedTokenAddress(mint_x, user.publicKey, false, tokenProgram);
     // user_y_ata = await getAssociatedTokenAddress(mint_y, user.publicKey, false, tokenProgram);
     // user_lp_ata = await getAssociatedTokenAddress(mint_lp, user.publicKey, false, tokenProgram);
@@ -89,9 +102,10 @@ describe("fairswap", () => {
     // })
     .accountsPartial({
       admin: initializer.publicKey,
+      auth,
       mintX: mint_x,
       mintY: mint_y,
-      mintLp: mint_lp,
+      // mintLp: mint_lp,
       vaultX: vault_x_ata,
       vaultY: vault_y_ata,
       config,
@@ -104,6 +118,7 @@ describe("fairswap", () => {
     ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
+    await logBalances(initializer.publicKey, "initialization", mint_x, mint_y);
   });
 
   it("Lock", async () => {
@@ -120,6 +135,50 @@ describe("fairswap", () => {
     ]).rpc();
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
+  });
+
+  it("Fail to deposit during lock", async () => {
+    try {
+      const tx = await program.methods.deposit(
+        new BN(20000),
+        new BN(20000),
+        new BN(30000)
+      )
+      .accountsStrict({
+        user: initializer.publicKey,
+        auth,
+        mintX: mint_x,
+        mintY: mint_y,
+        userAtaX: initializer_x_ata,
+        userAtaY: initializer_y_ata,
+        userAtaLp: initializer_lp_ata,
+        vaultX: vault_x_ata,
+        vaultY: vault_y_ata,
+        mintLp: mint_lp,
+        config,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      })
+      .signers([initializer])
+      .rpc();
+  
+      await confirmTx(tx);
+      console.log("Your deposit transaction signature", tx);
+      
+      // If we reach here, the transaction succeeded unexpectedly
+      assert.fail("Deposit transaction should have failed due to lock, but it succeeded");
+    } catch (e) {
+      if (e instanceof anchor.AnchorError) {
+        expect(e.error.errorCode.code).to.equal(
+          "PoolLocked",
+          "Expected PoolLocked error, but got a different error"
+        );
+      } else {
+        // If it's not an AnchorError, fail the test
+        expect.fail(`Expected AnchorError, but got: ${e}`);
+      }
+    }
   });
 
   it("Unlock", async () => {
@@ -152,6 +211,7 @@ describe("fairswap", () => {
         user1
       ]).rpc();
       console.log("Your transaction signature", tx);
+      assert.fail("Transaction should have failed but succeeded");
     } catch(e) {
       let err = e as anchor.AnchorError;
       if(err.error.errorCode.code !== "Unauthorized") {
@@ -174,6 +234,8 @@ describe("fairswap", () => {
         user2
       ]).rpc();
       console.log("Your transaction signature", tx);
+
+      assert.fail("Transaction should have failed but succeeded");
     } catch(e) {
       let err = e as anchor.AnchorError;
       if(err.error.errorCode.code !== "Unauthorized") {
@@ -184,12 +246,13 @@ describe("fairswap", () => {
 
   it("Deposit", async () => {
     const tx = await program.methods.deposit(
-      new BN(20),
-      new BN(20),
-      new BN(30)
+      new BN(20000),
+      new BN(20000),
+      new BN(30000)
     )
     .accountsStrict({
       user: initializer.publicKey,
+      auth,
       mintX: mint_x,
       mintY: mint_y,
       userAtaX: initializer_x_ata,
@@ -208,6 +271,68 @@ describe("fairswap", () => {
     ]).rpc();
     await confirmTx(tx);
     console.log("Your deposit transaction signature", tx);
+    await logBalances(initializer.publicKey, "deposit", mint_x, mint_y);
+  });
+
+  it("Swap X for Y", async () => {
+    const tx = await program.methods.swap(
+      mint_x,
+      new BN(5000),
+      new BN(6000)
+    )
+    .accountsPartial({
+      auth,
+      user: initializer.publicKey,
+      mintX: mint_x,
+      mintY: mint_y,
+      userAtaX: initializer_x_ata,
+      userAtaY: initializer_y_ata,
+      vaultX: vault_x_ata,
+      vaultY: vault_y_ata,
+      config,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    })
+    .signers([
+      initializer
+    ]).rpc();
+    await confirmTx(tx);
+    console.log("Your transaction signature", tx);
+    const currentSlot = await anchor.getProvider().connection.getSlot();
+    console.log(`Current slot is ${currentSlot}`);
+    await logBalances(initializer.publicKey, "swap X for Y", mint_x, mint_y);
+
+  });
+
+  it("Swap Y for X", async () => {
+    const tx = await program.methods.swap(
+      mint_y,
+      new BN(6000),
+      new BN(3000)
+    )
+    .accountsPartial({
+      auth,
+      user: initializer.publicKey,
+      mintX: mint_x,
+      mintY: mint_y,
+      userAtaX: initializer_x_ata,
+      userAtaY: initializer_y_ata,
+      vaultX: vault_x_ata,
+      vaultY: vault_y_ata,
+      config,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    })
+    .signers([
+      initializer
+    ]).rpc();
+    await confirmTx(tx);
+    console.log("Your transaction signature", tx);
+    const currentSlot = await anchor.getProvider().connection.getSlot();
+    console.log(`Current slot is ${currentSlot}`);
+    await logBalances(initializer.publicKey, "swap Y for X", mint_x, mint_y);
   });
 });
 
@@ -227,14 +352,50 @@ const confirmTxs = async (signatures: string[]) => {
   await Promise.all(signatures.map(confirmTx))
 }
 
-const newMintToAta = async (connection, minter: Keypair): Promise<{ mint: PublicKey, ata: PublicKey }> => { 
+const newMintToAta = async (connection, minter: Keypair, amount): Promise<{ mint: PublicKey, ata: PublicKey }> => { 
   const mint = await createMint(connection, minter, minter.publicKey, null, 6)
   // await getAccount(connection, mint, commitment)
   const ata = await createAccount(connection, minter, mint, minter.publicKey)
-  const signature = await mintTo(connection, minter, mint, ata, minter, 21e8)
+  const signature = await mintTo(connection, minter, mint, ata, minter, amount)
   await confirmTx(signature)
   return {
     mint,
     ata
   }
+}
+
+async function fetchTokenBalances(
+  connection: anchor.web3.Connection,
+  userPublicKey: PublicKey,
+  mintX: PublicKey,
+  mintY: PublicKey
+): Promise<{ balanceX: BN, balanceY: BN }> {
+  try {
+    // Get the associated token accounts for the user
+    const userAtaX = await getAssociatedTokenAddress(mintX, userPublicKey);
+    const userAtaY = await getAssociatedTokenAddress(mintY, userPublicKey);
+
+    // Fetch the account info for both token accounts
+    const [accountX, accountY] = await Promise.all([
+      getAccount(connection, userAtaX),
+      getAccount(connection, userAtaY)
+    ]);
+
+    // Return the balances as BN
+    return {
+      balanceX: new BN(accountX.amount.toString()),
+      balanceY: new BN(accountY.amount.toString())
+    };
+  } catch (error) {
+    console.error("Error fetching token balances:", error);
+    throw error;
+  }
+}
+
+async function logBalances(userPublicKey: PublicKey, operation: string, mint_x: PublicKey, mint_y: PublicKey) {
+  const connection = anchor.getProvider().connection;
+  const balances = await fetchTokenBalances(connection, userPublicKey, mint_x, mint_y);
+  console.log(`Balances after ${operation}:`);
+  console.log(`  X: ${balances.balanceX.toString()}`);
+  console.log(`  Y: ${balances.balanceY.toString()}`);
 }

@@ -18,6 +18,13 @@ pub struct Withdraw<'info> {
     pub mint_x: InterfaceAccount<'info, Mint>,
     pub mint_y: InterfaceAccount<'info, Mint>,
 
+    /// CHECK: this is safe
+    #[account(
+        seeds = [b"auth"],
+        bump = config.bump_auth,
+    )]
+    pub auth: UncheckedAccount<'info>,
+
     #[account(
         mut,
         associated_token::mint = mint_x,
@@ -44,14 +51,14 @@ pub struct Withdraw<'info> {
 
     #[account(
         associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::authority = auth,
         associated_token::token_program = token_program,
     )]
     pub vault_x: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        associated_token::mint = mint_x,
-        associated_token::authority = config,
+        associated_token::mint = mint_y,
+        associated_token::authority = auth,
         associated_token::token_program = token_program,
     )]
     pub vault_y: InterfaceAccount<'info, TokenAccount>,
@@ -59,7 +66,7 @@ pub struct Withdraw<'info> {
     #[account(
         mut,
         seeds = [b"mint_lp", config.key().as_ref()],
-        bump = config.lp_bump,
+        bump,
     )]
     pub mint_lp: InterfaceAccount<'info, Mint>,
 
@@ -80,7 +87,7 @@ impl <'info> Withdraw<'info> {
     pub fn withdraw(&mut self, amount:u64, min_x: u64, min_y: u64) -> Result<()> {
         require!(!self.config.locked, AmmError::PoolLocked);
         assert_non_zero!([amount, min_x, min_y]);
-        assert_not_locked!(self);
+        assert_not_locked!(self.config.locked);
 
         let amounts = ConstantProduct::xy_withdraw_amounts_from_l(self.vault_x.amount, self.vault_y.amount, self.mint_lp.supply, amount, 6).map_err(AmmError::from)?;
         let (x, y) = (amounts.x, amounts.y);

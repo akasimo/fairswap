@@ -24,8 +24,8 @@ macro_rules! assert_has_authority {
 
 #[macro_export]
 macro_rules! assert_not_locked {
-    ($x:expr) => {
-        if ($x.config.locked == true) {
+    ($lock:expr) => {
+        if $lock == true {
             return err!(AmmError::PoolLocked)
         }
     };

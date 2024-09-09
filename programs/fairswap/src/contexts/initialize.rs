@@ -14,12 +14,34 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
 
-    pub mint_x: InterfaceAccount<'info, Mint>,
-    pub mint_y: InterfaceAccount<'info, Mint>,
+    pub mint_x: Box<InterfaceAccount<'info, Mint>>,
+    pub mint_y: Box<InterfaceAccount<'info, Mint>>,
 
-    // /// CHECK: This account is only used to sign. it doesn't contain SOL
-    // #[account(seeds = [b"auth"], bump)]
-    // pub auth: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = admin,
+        associated_token::mint = mint_x,
+        associated_token::authority = auth,
+        // associated_token::token_program = token_program,
+    )]
+    pub vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    #[account(
+        init,
+        payer = admin,
+        associated_token::mint = mint_y,
+        associated_token::authority = auth,
+        // associated_token::token_program = token_program,
+    )]
+    pub vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    /// CHECK: this is safe
+    #[account(
+        seeds = [b"auth"],
+        bump,
+    )]
+    pub auth: UncheckedAccount<'info>,
+
     #[account(
         init,
         payer = admin,
@@ -38,35 +60,15 @@ pub struct Initialize<'info> {
     )]
     pub pooldata: Box<Account<'info, PoolData>>,
 
-    #[account(
-        init_if_needed,
-        payer = admin,
-        seeds = [b"mint_lp", config.key().as_ref()],
-        bump,
-        mint::authority = config,
-        mint::decimals = 6,
-        mint::freeze_authority = config,
-        mint::token_program = token_program,
-    )]
-    pub mint_lp: Box<InterfaceAccount<'info, Mint>>,
-
-    #[account(
-        init_if_needed,
-        payer = admin,
-        associated_token::mint = mint_x,
-        associated_token::authority = config,
-        // associated_token::token_program = token_program,
-    )]
-    pub vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        init_if_needed,
-        payer = admin,
-        associated_token::mint = mint_y,
-        associated_token::authority = config,
-        // associated_token::token_program = token_program,
-    )]
-    pub vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
+    // #[account(
+    //     init,
+    //     payer = admin,
+    //     seeds = [b"mint_lp", config.key().as_ref()],
+    //     bump,
+    //     mint::authority = auth,
+    //     mint::decimals = 6,
+    // )]
+    // pub mint_lp: Box<InterfaceAccount<'info, Mint>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -83,8 +85,9 @@ impl<'info> Initialize<'info> {
             locked: false,
             mint_x: self.mint_x.key(),
             mint_y: self.mint_y.key(),
-            lp_bump: bumps.mint_lp,
+            // bump_lp: bumps.mint_lp,
             bump: bumps.config,
+            bump_auth: bumps.auth
         });
         self.pooldata.set_inner(PoolData {
             last_slot: 0,

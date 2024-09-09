@@ -9,6 +9,7 @@ pub struct Config {
     pub mint_x: Pubkey,
     pub mint_y: Pubkey,
     pub locked: bool,
-    pub lp_bump: u8,
+    // pub bump_lp: u8,
     pub bump: u8,
+    pub bump_auth: u8
 }
