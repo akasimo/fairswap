@@ -6,6 +6,7 @@ skip-lint = false
 
 [programs.localnet]
 fairswap = "69hNfSV6nw46VXAJ3ukAQhSXikKdX2L3nP4UkLDEMnrr"
+simple_amm = "A1X5VnxNAYpS4zGUsHA5s7rx625qeU8P5EnqnGHeU6jW"
 
 [registry]
 url = "https://api.apr.dev"
