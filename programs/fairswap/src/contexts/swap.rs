@@ -114,46 +114,78 @@ impl<'info> Swap<'info> {
             m if m == self.mint_y.key() => (LiquidityPair::Y, self.mint_x.key(), true),
             _ => return Err(AmmError::InvalidInputMint.into()),
         };
-
+        msg!("is_buying_x: {}", is_buying_x);
         let res = curve
             .swap(p, amount_in, amount_out_min)
             .map_err(AmmError::from)?;
 
-        let current_slot = Clock::get()?.slot;
-
-        if current_slot != self.pooldata.last_slot {
-            self.pooldata.last_slot = current_slot;
-            self.pooldata.buying_x_high = None;
-            self.pooldata.buying_y_high = None;
-        }
-
         let mut current_ratio =
-            calculate_limit_price(res.withdraw, res.deposit, self.pooldata.precision)?;
+            calculate_limit_price(res.deposit, res.withdraw, self.pooldata.precision)?;
+        msg!("current_ratio: {}", current_ratio);
+
+        let current_slot = Clock::get()?.slot;
+        if current_slot != self.pooldata.last_slot {
+            msg!("Updating pool data");
+            self.pooldata.last_slot = current_slot;
+            if is_buying_x {
+                self.pooldata.buying_x_high = Some(current_ratio);
+                self.pooldata.buying_y_high = Some(calculate_limit_price(
+                    self.vault_x.amount,
+                    self.vault_y.amount,
+                    self.pooldata.precision,
+                )?);
+                msg!("updated buying_x_high");
+            } else {
+                self.pooldata.buying_x_high = Some(calculate_limit_price(
+                    self.vault_y.amount,
+                    self.vault_x.amount,
+                    self.pooldata.precision,
+                )?);
+                self.pooldata.buying_y_high = Some(current_ratio);
+                msg!("updated buying_y_high");
+            }
+        }
+        // msg!("current_slot: {}", current_slot);
 
         // Determine the price limit based on whether we are buying X or Y
-        let price_limit = if is_buying_x {
-            &mut self.pooldata.buying_x_high
+        if is_buying_x {
+            if current_ratio > self.pooldata.buying_x_high.unwrap() {
+                self.pooldata.buying_x_high = Some(current_ratio);
+                msg!("updated buying_x_high");
+            } else if current_ratio < self.pooldata.buying_x_high.unwrap() {
+                current_ratio = self.pooldata.buying_x_high.unwrap();
+                msg!("current_ratio: {}", current_ratio);
+            }
         } else {
-            &mut self.pooldata.buying_y_high
-        };
-        // Update the price limit if necessary
-        if price_limit.is_none() {
-            *price_limit = Some(current_ratio);
-        } else if current_ratio > price_limit.unwrap() {
-            current_ratio = price_limit.unwrap();
-        } else if current_ratio < price_limit.unwrap() {
-            *price_limit = Some(current_ratio);
+            if current_ratio > self.pooldata.buying_y_high.unwrap() {
+                self.pooldata.buying_y_high = Some(current_ratio);
+                msg!("updated buying_y_high");
+            } else if current_ratio < self.pooldata.buying_y_high.unwrap() {
+                current_ratio = self.pooldata.buying_y_high.unwrap();
+                msg!("current_ratio: {}", current_ratio);
+            }
         }
 
-        let withdraw_amount = current_ratio
-            .checked_mul(res.deposit as u128)
-            .ok_or(AmmError::Overflow)?
-            .checked_div(
+        msg!("og withdraw amount: {}", res.withdraw);
+        let withdraw_amount = (res.deposit as u128)
+            .checked_mul(
                 10u128
                     .checked_pow(self.pooldata.precision as u32)
                     .ok_or(AmmError::InvalidPrecision)?,
             )
+            .ok_or(AmmError::Overflow)?
+            .checked_div(current_ratio)
             .ok_or(AmmError::Overflow)? as u64;
+        // let withdraw_amount = current_ratio
+        //     .checked_mul(res.deposit as u128)
+        //     .ok_or(AmmError::Overflow)?
+        //     .checked_div(
+        //         10u128
+        //             .checked_pow(self.pooldata.precision as u32)
+        //             .ok_or(AmmError::InvalidPrecision)?,
+        //     )
+        //     .ok_or(AmmError::Overflow)? as u64;
+        msg!("withdraw_amount: {}", withdraw_amount);
 
         require!(
             withdraw_amount >= amount_out_min,
