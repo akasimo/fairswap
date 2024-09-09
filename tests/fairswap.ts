@@ -2,16 +2,15 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { Fairswap } from "../target/types/fairswap";
 
-import { ConstantProduct, LiquidityPair } from "constant-product-curve-wasm";
 import { PublicKey, Commitment, Keypair, SystemProgram } from "@solana/web3.js"
-import { ASSOCIATED_TOKEN_PROGRAM_ID as associatedTokenProgram, TOKEN_PROGRAM_ID as tokenProgram, createMint, createAccount, mintTo, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token"
+import { TOKEN_PROGRAM_ID as tokenProgram, createMint, createAccount, mintTo, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token"
 import { randomBytes } from "crypto"
 import { assert, expect } from "chai"
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 
 const commitment: Commitment = "confirmed";
 
-describe("fairswap", () => {
+describe("fairswap general amm functions", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
 
