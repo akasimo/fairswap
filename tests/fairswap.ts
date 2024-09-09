@@ -44,7 +44,7 @@ describe("fairswap", () => {
 
   it("Create mints, tokens and ATAs", async () => {
     // Create mints and ATAs
-    let [u1, u2] = await Promise.all([initializer, initializer].map(async (a) => { return await newMintToAta(anchor.getProvider().connection, a, 1e6) }))
+    let [u1, u2] = await Promise.all([initializer, initializer].map(async (a) => { return await newMintToAta(anchor.getProvider().connection, a, 1e8) }))
     mint_x = u1.mint;
     mint_y = u2.mint;
     initializer_x_ata = u1.ata;
@@ -140,9 +140,9 @@ describe("fairswap", () => {
   it("Fail to deposit during lock", async () => {
     try {
       const tx = await program.methods.deposit(
-        new BN(20000),
-        new BN(20000),
-        new BN(30000)
+        new BN(2e5),
+        new BN(2e5),
+        new BN(3e5)
       )
         .accountsStrict({
           user: initializer.publicKey,
@@ -246,9 +246,9 @@ describe("fairswap", () => {
 
   it("Deposit", async () => {
     const tx = await program.methods.deposit(
-      new BN(20000),
-      new BN(20000),
-      new BN(30000)
+      new BN(2e5),
+      new BN(2e5),
+      new BN(3e5)
     )
       .accountsStrict({
         user: initializer.publicKey,
@@ -308,8 +308,8 @@ describe("fairswap", () => {
   it("Swap Y for X", async () => {
     const tx = await program.methods.swap(
       mint_y,
-      new BN(6000),
-      new BN(3000)
+      new BN(7330),
+      new BN(4500)
     )
       .accountsPartial({
         auth,
@@ -338,9 +338,9 @@ describe("fairswap", () => {
 
   it("Withdraw", async () => {
     const tx = await program.methods.withdraw(
-      new BN(20000),
-      new BN(20000),
-      new BN(30000)
+      new BN(2e5),
+      new BN(2e5 * 0.99),
+      new BN(3e5 * 0.99)
     )
       .accountsStrict({
         user: initializer.publicKey,
