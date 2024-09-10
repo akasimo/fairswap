@@ -2,24 +2,22 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { Fairswap } from "../target/types/fairswap";
 
-import { PublicKey, Commitment, Keypair, SystemProgram } from "@solana/web3.js"
-import { TOKEN_PROGRAM_ID as tokenProgram, createMint, createAccount, mintTo, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token"
+import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js"
+import { TOKEN_PROGRAM_ID as tokenProgram, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token"
 import { randomBytes } from "crypto"
 import { assert, expect } from "chai"
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
+import { confirmTx, confirmTxs, logBalances, newMintToAta } from "./utils";
 
-const commitment: Commitment = "confirmed";
 
 describe("fairswap general amm functions", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace.Fairswap as Program<Fairswap>;
-
   const [initializer, user1, user2] = [new Keypair(), new Keypair(), new Keypair()];
 
   // Random seed
-  // const seed = new BN(randomBytes(8));
   const seed = new BN(randomBytes(8));
   const auth = PublicKey.findProgramAddressSync([Buffer.from("auth")], program.programId)[0];
 
@@ -30,6 +28,10 @@ describe("fairswap general amm functions", () => {
   let initializer_x_ata: PublicKey;
   let initializer_y_ata: PublicKey;
   let initializer_lp_ata: PublicKey;
+  let user1_x_ata: PublicKey;
+  let user1_y_ata: PublicKey;
+  let user2_x_ata: PublicKey;
+  let user2_y_ata: PublicKey;
   let vault_x_ata: PublicKey;
   let vault_y_ata: PublicKey;
   let vault_lp_ata: PublicKey;
@@ -41,38 +43,28 @@ describe("fairswap general amm functions", () => {
     })).then(confirmTxs);
   });
 
+  // Create mints and ATAs
   it("Create mints, tokens and ATAs", async () => {
-    // Create mints and ATAs
     let [u1, u2] = await Promise.all([initializer, initializer].map(async (a) => { return await newMintToAta(anchor.getProvider().connection, a, 1e8) }))
     mint_x = u1.mint;
     mint_y = u2.mint;
     initializer_x_ata = u1.ata;
     initializer_y_ata = u2.ata;
 
-    // const user1_x_ata = await createAccount(anchor.getProvider().connection, initializer, mint_x, user1.publicKey);
-    // await mintTo(anchor.getProvider().connection, initializer, mint_x, user1_x_ata, user1, 10e7);
-
-    // const user1_y_ata = await createAccount(anchor.getProvider().connection, initializer, mint_y, user1.publicKey);
-    // await mintTo(anchor.getProvider().connection, initializer, mint_y, user1_y_ata, user1, 10e7);
-
-    // const user2_x_ata = await createAccount(anchor.getProvider().connection, initializer, mint_x, user2.publicKey);
-    // await mintTo(anchor.getProvider().connection, initializer, mint_x, user2_x_ata, user2, 10e7);
-
-    // const user2_y_ata = await createAccount(anchor.getProvider().connection, initializer, mint_y, user2.publicKey);
-    // await mintTo(anchor.getProvider().connection, initializer, mint_y, user2_y_ata, user2, 10e7);
+    // //user currently not used but creating for future tests
+    // user1_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user1.publicKey, 5000);
+    // user1_y_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_y, user1.publicKey, 0);
+    // user2_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user2.publicKey, 5000);
+    // user2_y_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_y, user2.publicKey, 0);
 
     config = PublicKey.findProgramAddressSync([Buffer.from("config"), mint_x.toBuffer(), mint_y.toBuffer(), seed.toBuffer().reverse()], program.programId)[0];
-
     mint_lp = PublicKey.findProgramAddressSync([Buffer.from("mint_lp"), config.toBuffer()], program.programId)[0];
-
     initializer_lp_ata = await getAssociatedTokenAddress(mint_lp, initializer.publicKey, false, tokenProgram);
+
     // Create take ATAs
     vault_x_ata = await getAssociatedTokenAddress(mint_x, auth, true, tokenProgram);
     vault_y_ata = await getAssociatedTokenAddress(mint_y, auth, true, tokenProgram);
     vault_lp_ata = await getAssociatedTokenAddress(mint_lp, auth, true, tokenProgram);
-    // user_x_ata = await getAssociatedTokenAddress(mint_x, user.publicKey, false, tokenProgram);
-    // user_y_ata = await getAssociatedTokenAddress(mint_y, user.publicKey, false, tokenProgram);
-    // user_lp_ata = await getAssociatedTokenAddress(mint_lp, user.publicKey, false, tokenProgram);
   })
 
   it("Initialize", async () => {
@@ -118,6 +110,7 @@ describe("fairswap general amm functions", () => {
     await confirmTx(tx);
     console.log("Your transaction signature", tx);
     await logBalances(initializer.publicKey, "initialization", mint_x, mint_y);
+    
   });
 
   it("Lock", async () => {
@@ -301,7 +294,6 @@ describe("fairswap general amm functions", () => {
     const currentSlot = await anchor.getProvider().connection.getSlot();
     console.log(`Current slot is ${currentSlot}`);
     await logBalances(initializer.publicKey, "swap X for Y", mint_x, mint_y);
-
   });
 
   it("Swap Y for X", async () => {
@@ -334,12 +326,146 @@ describe("fairswap general amm functions", () => {
     await logBalances(initializer.publicKey, "swap Y for X", mint_x, mint_y);
   });
 
+  it("Sandwich Self", async () => {
+    const swapAccounts = {
+      auth,
+      user: initializer.publicKey,
+      mintX: mint_x,
+      mintY: mint_y,
+      userAtaX: initializer_x_ata,
+      userAtaY: initializer_y_ata,
+      vaultX: vault_x_ata,
+      vaultY: vault_y_ata,
+      config,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    }
+
+    const ix1 = await program.methods.swap(
+      mint_y,
+      new BN(15000),
+      new BN(800)
+    ).accountsPartial(swapAccounts).instruction();
+
+    const ix2 = await program.methods.swap(
+      mint_y,
+      new BN(15000),
+      new BN(800)
+    ).accountsPartial(swapAccounts).instruction();
+
+    const ix3 = await program.methods.swap(
+      mint_x,
+      new BN(18191),
+      new BN(800)
+    ).accountsPartial(swapAccounts).instruction();
+    const tx = new anchor.web3.Transaction().add(ix1, ix2, ix3);
+    const txSignature = await anchor.web3.sendAndConfirmTransaction(
+      program.provider.connection,
+      tx,
+      [initializer]
+    );
+    // const txSignature = await program.provider.connection.sendTransaction(
+    //   tx,
+    //   [initializer],
+    //   { skipPreflight: true }
+    // );
+    // await new Promise(resolve => setTimeout(resolve, 1000));
+    // const txDetails = await program.provider.connection.getTransaction(txSignature, {
+    //   maxSupportedTransactionVersion: 0,
+    //   commitment: "confirmed"
+    // });
+    // console.log(txDetails);
+    // // throw new Error("test");
+    // const logs = txDetails?.meta?.logMessages || null;
+
+    // if (logs) {
+    //   console.log(logs);
+    // }
+    // if (txDetails?.meta?.err) {
+    //   throw new Error(`Transaction failed: ${JSON.stringify(txDetails.meta.err)}`);
+    // }
+    console.log("Your sandwich transaction signature", txSignature);
+    const currentSlot = await anchor.getProvider().connection.getSlot();
+    console.log(`Current slot is ${currentSlot}`);
+    await logBalances(initializer.publicKey, "sandwich self", mint_x, mint_y);
+  });
+
+  xit("real mev", async () => {
+    console.log("user1 balances");
+    await logBalances(user1.publicKey, "real mev", mint_x, mint_y);
+    console.log("user2 balances");
+    await logBalances(user2.publicKey, "real mev", mint_x, mint_y);
+    console.log("user1 pubkey:", user1.publicKey.toBase58());
+    console.log("user2 pubkey:", user2.publicKey.toBase58());
+
+    const swapAccounts = {
+      auth,
+      user: user1.publicKey,
+      mintX: mint_x,
+      mintY: mint_y,
+      vaultX: vault_x_ata,
+      vaultY: vault_y_ata,
+      config,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    }
+
+    const tx_user1_1 = await program.methods.swap(
+      mint_y,
+      new BN(1500),
+      new BN(80)
+    ).accountsPartial({
+      ...swapAccounts,
+      userAtaX: user1_x_ata,
+      userAtaY: user1_y_ata
+    }).instruction();
+
+    const tx_user2_1 = await program.methods.swap(
+      mint_y,
+      new BN(1500),
+      new BN(80)
+    ).accountsPartial({
+      ...swapAccounts,
+      userAtaX: user2_x_ata,
+      userAtaY: user2_y_ata
+    }).instruction();
+
+    const tx_user1_2 = await program.methods.swap(
+      mint_x,
+      new BN(900),
+      new BN(80)
+    ).accountsPartial({
+      ...swapAccounts,
+      userAtaX: user1_x_ata,
+      userAtaY: user1_y_ata
+    }).instruction();
+    // Add instructions in the desired order
+    const tx = new anchor.web3.Transaction().add(tx_user1_1, tx_user1_2);
+
+    // Sign the transaction with both users
+    const txSignature = await anchor.web3.sendAndConfirmTransaction(
+      program.provider.connection,
+      tx,
+      [user1, user2],
+      { skipPreflight: true }
+    );
+
+    console.log("Your sandwich transaction signature", txSignature);
+    const currentSlot = await anchor.getProvider().connection.getSlot();
+    console.log(`Current slot is ${currentSlot}`);
+    console.log("user1 balances");
+    await logBalances(user1.publicKey, "real mev", mint_x, mint_y);
+    console.log("user2 balances");
+    await logBalances(user2.publicKey, "real mev", mint_x, mint_y);
+  })
 
   it("Withdraw", async () => {
     const tx = await program.methods.withdraw(
       new BN(2e5),
-      new BN(2e5 * 0.99),
-      new BN(3e5 * 0.99)
+      new BN(2e5 * 0.49),
+      new BN(3e5 * 0.49)
     )
       .accountsStrict({
         user: initializer.publicKey,
@@ -366,66 +492,3 @@ describe("fairswap general amm functions", () => {
   });
 });
 
-// Helpers
-const confirmTx = async (signature: string) => {
-  const latestBlockhash = await anchor.getProvider().connection.getLatestBlockhash();
-  await anchor.getProvider().connection.confirmTransaction(
-    {
-      signature,
-      ...latestBlockhash,
-    },
-    commitment
-  )
-}
-
-const confirmTxs = async (signatures: string[]) => {
-  await Promise.all(signatures.map(confirmTx))
-}
-
-const newMintToAta = async (connection, minter: Keypair, amount): Promise<{ mint: PublicKey, ata: PublicKey }> => {
-  const mint = await createMint(connection, minter, minter.publicKey, null, 6)
-  // await getAccount(connection, mint, commitment)
-  const ata = await createAccount(connection, minter, mint, minter.publicKey)
-  const signature = await mintTo(connection, minter, mint, ata, minter, amount)
-  await confirmTx(signature)
-  return {
-    mint,
-    ata
-  }
-}
-
-async function fetchTokenBalances(
-  connection: anchor.web3.Connection,
-  userPublicKey: PublicKey,
-  mintX: PublicKey,
-  mintY: PublicKey
-): Promise<{ balanceX: BN, balanceY: BN }> {
-  try {
-    // Get the associated token accounts for the user
-    const userAtaX = await getAssociatedTokenAddress(mintX, userPublicKey);
-    const userAtaY = await getAssociatedTokenAddress(mintY, userPublicKey);
-
-    // Fetch the account info for both token accounts
-    const [accountX, accountY] = await Promise.all([
-      getAccount(connection, userAtaX),
-      getAccount(connection, userAtaY)
-    ]);
-
-    // Return the balances as BN
-    return {
-      balanceX: new BN(accountX.amount.toString()),
-      balanceY: new BN(accountY.amount.toString())
-    };
-  } catch (error) {
-    console.error("Error fetching token balances:", error);
-    throw error;
-  }
-}
-
-async function logBalances(userPublicKey: PublicKey, operation: string, mint_x: PublicKey, mint_y: PublicKey) {
-  const connection = anchor.getProvider().connection;
-  const balances = await fetchTokenBalances(connection, userPublicKey, mint_x, mint_y);
-  console.log(`Balances after ${operation}:`);
-  console.log(`  X: ${balances.balanceX.toString()}`);
-  console.log(`  Y: ${balances.balanceY.toString()}`);
-}
