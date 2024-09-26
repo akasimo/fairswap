@@ -378,7 +378,6 @@ describe("fairswap general amm functions", () => {
     // console.log(txDetails);
     // // throw new Error("test");
     // const logs = txDetails?.meta?.logMessages || null;
-
     // if (logs) {
     //   console.log(logs);
     // }

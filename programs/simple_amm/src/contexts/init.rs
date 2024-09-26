@@ -58,10 +58,10 @@ pub struct Initialize<'info> {
 impl<'info> Initialize<'info> {
     pub fn init(
         &mut self,
-        bumps: &InitializeBumps,
         seed: u64,
         fee: u16,
         authority: Option<Pubkey>,
+        bumps: &InitializeBumps,
     ) -> Result<()> {
         require!(fee <= 10000, AmmError::FeePercentErr);
         self.config.init(

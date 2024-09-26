@@ -20,7 +20,7 @@ pub mod simple_amm {
         authority: Option<Pubkey>, // Update authority (if required)
     ) -> Result<()> {
         // Initialise our AMM config
-        ctx.accounts.init(&ctx.bumps, seed, fee, authority)
+        ctx.accounts.init(seed, fee, authority, &ctx.bumps)
     }
 
     pub fn deposit(

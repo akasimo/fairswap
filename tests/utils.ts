@@ -19,15 +19,15 @@ export const confirmTx = async (signature: string) => {
 }
 
 export const confirmTxs = async (signatures: string[]) => {
-    await Promise.all(signatures.map(confirmTx))
+    await Promise.all(signatures.map(confirmTx));
 }
 
 export const newMintToAta = async (connection, minter: Keypair, amount): Promise<{ mint: PublicKey, ata: PublicKey }> => {
-    const mint = await createMint(connection, minter, minter.publicKey, null, 6)
+    const mint = await createMint(connection, minter, minter.publicKey, null, 6);
     // await getAccount(connection, mint, commitment)
-    const ata = await createAccount(connection, minter, mint, minter.publicKey)
-    const signature = await mintTo(connection, minter, mint, ata, minter, amount)
-    await confirmTx(signature)
+    const ata = await createAccount(connection, minter, mint, minter.publicKey);
+    const signature = await mintTo(connection, minter, mint, ata, minter, amount);
+    await confirmTx(signature);
     return {
         mint,
         ata
@@ -62,12 +62,13 @@ export async function fetchTokenBalances(
     }
 }
 
-export async function logBalances(userPublicKey: PublicKey, operation: string, mint_x: PublicKey, mint_y: PublicKey) {
+export async function logBalances(userPublicKey: PublicKey, operation: string, mint_x: PublicKey, mint_y: PublicKey): Promise<{ balanceX: BN, balanceY: BN }> {
     const connection = anchor.getProvider().connection;
     const balances = await fetchTokenBalances(connection, userPublicKey, mint_x, mint_y);
-    console.log(`Balances after ${operation}:`);
+    console.log(`Balances ${operation}:`);
     console.log(`  X: ${balances.balanceX.toString()}`);
     console.log(`  Y: ${balances.balanceY.toString()}`);
+    return { balanceX: balances.balanceX, balanceY: balances.balanceY };
 }
 
 export async function createAndFundATA(
