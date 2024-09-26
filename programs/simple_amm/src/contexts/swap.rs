@@ -26,25 +26,33 @@ pub struct Swap<'info> {
     #[account(
         mut, 
         associated_token::mint = mint_x,
-        associated_token::authority = auth
+        associated_token::authority = auth,
+        // associated_token::token_program = token_program,
     )]
     pub vault_x: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut, 
         associated_token::mint = mint_y,
-        associated_token::authority = auth
+        associated_token::authority = auth,
+        // associated_token::token_program = token_program,
     )]
     pub vault_y: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
+        // init_if_needed,
+        // payer = user,
         associated_token::mint = mint_x,
         associated_token::authority = user,
+        // associated_token::token_program = token_program,
     )]
     pub user_x: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
+        // init_if_needed,
+        // payer = user,
         associated_token::mint = mint_y,
         associated_token::authority = user,
+        associated_token::token_program = token_program,
     )]
     pub user_y: Box<InterfaceAccount<'info, TokenAccount>>,
     /// CHECK: this is safe
@@ -92,6 +100,7 @@ impl<'info> Swap<'info> {
         self.withdraw_token(is_x, res.withdraw)?;
         Ok(())
     }
+
     pub fn deposit_token(&mut self, is_x: bool, amount: u64) -> Result<()> {
         let mint;
         let (from, to) = match is_x {
@@ -117,22 +126,24 @@ impl<'info> Swap<'info> {
             to,
             authority: self.user.to_account_info(),
         };
+        
         let ctx = CpiContext::new(self.token_program.to_account_info(), account);
-
+        
         transfer_checked(ctx, amount, 6)
     }
+
     pub fn withdraw_token(&mut self, is_x: bool, amount: u64) -> Result<()> {
         let mint;
         let (from, to) = match is_x {
             true => {
-                mint = self.mint_x.clone();
+                mint = self.mint_y.clone();
                 (
                     self.vault_y.to_account_info(),
                     self.user_y.to_account_info(),
                 )
             }
             false => {
-                mint = self.mint_y.clone();
+                mint = self.mint_x.clone();
                 (
                     self.vault_x.to_account_info(),
                     self.user_x.to_account_info(),

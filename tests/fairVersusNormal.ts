@@ -1,14 +1,14 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { Fairswap } from "../target/types/fairswap";
+import { SimpleAmm } from "../target/types/simple_amm";
 
 import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js"
 import { TOKEN_PROGRAM_ID as tokenProgram, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token"
 import { randomBytes } from "crypto"
 import { assert, expect } from "chai"
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
-import { confirmTx, confirmTxs, createAndFundATA, logBalances, newMintToAta } from "./utils";
-import { SimpleAmm } from "../target/types/simple_amm";
+import { buildTxConfirmOrLog, confirmTx, confirmTxs, createAndFundATA, logBalances, newMintToAta } from "./utils";
 
 // herşeyi initle ve mintle
 // 2 borsayı da initle
@@ -18,7 +18,7 @@ describe("fairswap compared to regular amm", () => {
     anchor.setProvider(anchor.AnchorProvider.env());
 
     const program_fairswap = anchor.workspace.Fairswap as Program<Fairswap>;
-    const program_normal = anchor.workspace.Fairswap as Program<SimpleAmm>;
+    const program_normal = anchor.workspace.SimpleAmm as Program<SimpleAmm>;
 
     const [initializer, user1, user2] = [new Keypair(), new Keypair(), new Keypair()];
 
@@ -64,9 +64,9 @@ describe("fairswap compared to regular amm", () => {
         initializer_y_ata = u2.ata;
 
         //user currently not used but creating for future tests
-        user1_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user1.publicKey, 5000);
+        user1_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user1.publicKey, 50000);
         user1_y_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_y, user1.publicKey, 0);
-        user2_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user2.publicKey, 5000);
+        user2_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user2.publicKey, 50000);
         user2_y_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_y, user2.publicKey, 0);
 
         // create config and lp mint for fairswap
@@ -89,12 +89,28 @@ describe("fairswap compared to regular amm", () => {
         vault_y_ata_normal = await getAssociatedTokenAddress(mint_y, auth_normal, true, tokenProgram);
         vault_lp_ata_normal = await getAssociatedTokenAddress(mint_lp_normal, auth_normal, true, tokenProgram);
     })
+    console.log("Fairswap program ID:", program_fairswap.programId.toBase58());
+    console.log("Normal AMM program ID:", program_normal.programId.toBase58());
 
     it("Initialize", async () => {
+        console.log(`Mint1 is ${mint_x.toBase58()}`);
+        console.log(`Mint2 is ${mint_y.toBase58()}`);
+        console.log(`Auth1 is ${auth_fairswap.toBase58()}`);
+        console.log(`Auth2 is ${auth_normal.toBase58()}`);
+        console.log(`Config1 is ${config_fairswap.toBase58()}`);
+        console.log(`Config2 is ${config_normal.toBase58()}`);
+        console.log(`VaultX1 is ${vault_x_ata_fairswap.toBase58()}`);
+        console.log(`VaultY1 is ${vault_y_ata_fairswap.toBase58()}`);
+        console.log(`VaultX2 is ${vault_x_ata_normal.toBase58()}`);
+        console.log(`VaultY2 is ${vault_y_ata_normal.toBase58()}`);
+        console.log(`Lp1 is ${mint_lp_fairswap.toBase58()}`);
+        console.log(`Lp2 is ${mint_lp_normal.toBase58()}`);
+        console.log(`initializer is ${initializer.publicKey.toBase58()}`);
+
         const tx = await program_fairswap.methods.initialize(
-            seed,
-            0
-        )
+                seed,
+                0
+            )
             .accountsPartial({
                 admin: initializer.publicKey,
                 auth: auth_fairswap,
@@ -111,14 +127,14 @@ describe("fairswap compared to regular amm", () => {
                 initializer
             ]).rpc();
         await confirmTx(tx);
-        console.log("Your transaction signature", tx);
-        // await logBalances(initializer.publicKey, "initialization", mint_x, mint_y);
+        console.log("Fairswap initialization transaction signature", tx);
+        await logBalances(initializer.publicKey, "initialization", mint_x, mint_y);
 
         const tx2 = await program_normal.methods.initialize(
-            seed,
-            0,
-            initializer.publicKey
-        )
+                seed,
+                0,
+                initializer.publicKey
+            )
             .accountsPartial({
                 auth: auth_normal,
                 initializer: initializer.publicKey,
@@ -135,19 +151,19 @@ describe("fairswap compared to regular amm", () => {
                 initializer
             ]).rpc();
         await confirmTx(tx2);
-        console.log("Your transaction signature", tx2);
+        console.log("Normal AMM initialization transaction signature", tx2);
     });
 
-    const amountDepositX = 2e5;
-    const amountDepositY = 2e5;
-    const amountDepositLP = 3e5;
+    const amountDepositX = 2e6;
+    const amountDepositY = 2e6;
+    const amountDepositLP = 2e6;
 
-    xit("Deposit to Both AMMs", async () => {
+    it("Deposit to Both AMMs", async () => {
         const tx = await program_fairswap.methods.deposit(
-            new BN(amountDepositLP),
-            new BN(amountDepositX),
-            new BN(amountDepositY)
-        )
+                new BN(amountDepositLP),
+                new BN(amountDepositX),
+                new BN(amountDepositY)
+            )
             .accountsStrict({
                 user: initializer.publicKey,
                 auth: auth_fairswap,
@@ -169,22 +185,57 @@ describe("fairswap compared to regular amm", () => {
             ]).rpc();
         await confirmTx(tx);
         console.log("Your deposit transaction signature", tx);
-        await logBalances(initializer.publicKey, "deposit", mint_x, mint_y);
+        // await logBalances(initializer.publicKey, "deposit", mint_x, mint_y);
+        const tx2 = await program_normal.methods.deposit(
+            new BN(amountDepositLP),
+            new BN(amountDepositX),
+            new BN(amountDepositY),
+            new BN(Math.floor(new Date().getTime()/1000) + 600)
+          )
+          .accountsStrict({
+            auth: auth_normal,
+            user: initializer.publicKey,
+            mintX: mint_x,
+            mintY: mint_y,
+            mintLp: mint_lp_normal,
+            userX: initializer_x_ata,
+            userY: initializer_y_ata,
+            userLp: initializer_lp_ata_normal,
+            vaultX: vault_x_ata_normal,
+            vaultY: vault_y_ata_normal,
+            config: config_normal,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+            systemProgram: SystemProgram.programId
+          })
+          .signers([
+            initializer
+          ]).rpc();
+          await confirmTx(tx2);
     });
 
-    xit("Swap X for Y", async () => {
+    const amountSwapX = 2e4;
+    const amountSwapYMin = 1e4;
+
+    it("Swap X for Y", async () => {
+
+        let balances_user1 = await logBalances(user1.publicKey, "of user1 before swap", mint_x, mint_y);
+        let balances_user2 = await logBalances(user2.publicKey, "of user2 before swap", mint_x, mint_y);
+        assert(balances_user1.balanceX.eq(balances_user2.balanceX), "User 1 should have equal X as user 2 before swap");
+        assert(balances_user1.balanceY.eq(balances_user2.balanceY), "User 1 should have equal Y as user 2 before swap");
+
         const tx = await program_fairswap.methods.swap(
             mint_x,
-            new BN(5000),
-            new BN(6000)
+            new BN(amountSwapX),
+            new BN(amountSwapYMin)
         )
             .accountsPartial({
                 auth: auth_fairswap,
-                user: initializer.publicKey,
+                user: user1.publicKey,
                 mintX: mint_x,
                 mintY: mint_y,
-                userAtaX: initializer_x_ata,
-                userAtaY: initializer_y_ata,
+                userAtaX: user1_x_ata,
+                userAtaY: user1_y_ata,
                 vaultX: vault_x_ata_fairswap,
                 vaultY: vault_y_ata_fairswap,
                 config: config_fairswap,
@@ -193,43 +244,113 @@ describe("fairswap compared to regular amm", () => {
                 systemProgram: SystemProgram.programId
             })
             .signers([
-                initializer
+                user1
             ]).rpc();
         await confirmTx(tx);
         console.log("Your transaction signature", tx);
-        const currentSlot = await anchor.getProvider().connection.getSlot();
-        console.log(`Current slot is ${currentSlot}`);
-        await logBalances(initializer.publicKey, "swap X for Y", mint_x, mint_y);
-    });
 
-    xit("Swap Y for X", async () => {
-        const tx = await program_fairswap.methods.swap(
-            mint_y,
-            new BN(7330),
-            new BN(4500)
-        )
-            .accountsPartial({
-                auth: auth_fairswap,
-                user: initializer.publicKey,
-                mintX: mint_x,
-                mintY: mint_y,
-                userAtaX: initializer_x_ata,
-                userAtaY: initializer_y_ata,
-                vaultX: vault_x_ata_fairswap,
-                vaultY: vault_y_ata_fairswap,
-                config: config_fairswap,
-                tokenProgram: TOKEN_PROGRAM_ID,
-                associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-                systemProgram: SystemProgram.programId
-            })
-            .signers([
-                initializer
-            ]).rpc();
-        await confirmTx(tx);
-        console.log("Your transaction signature", tx);
-        const currentSlot = await anchor.getProvider().connection.getSlot();
-        console.log(`Current slot is ${currentSlot}`);
-        await logBalances(initializer.publicKey, "swap Y for X", mint_x, mint_y);
+        // Get and print logs for fairswap transaction
+        const fairswapLogs = await anchor.getProvider().connection.getTransaction(tx, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0
+        });
+        console.log("Fairswap transaction logs:");
+        fairswapLogs?.meta?.logMessages?.forEach(log => console.log(log));
+
+
+        // Normal amm transaction
+
+        console.log("\nSwapping on normal amm");
+        console.log("Withdraw from", vault_y_ata_normal.toBase58());
+        console.log("Withdraw to", user2_y_ata.toBase58());
+        console.log("Authority", auth_normal.toBase58());
+
+        // Get and print mint addresses of from and deposit ATAs for normal AMM
+        const connection = anchor.getProvider().connection;
+        
+        // For vault_y_ata_normal (withdraw from)
+        const vaultYAccountInfo = await connection.getParsedAccountInfo(vault_y_ata_normal);
+        if (vaultYAccountInfo.value && 'parsed' in vaultYAccountInfo.value.data) {
+            const mintAddress = vaultYAccountInfo.value.data.parsed.info.mint;
+            console.log("Vault Y ATA (deposit) mint:", mintAddress);
+        }
+
+        // For user2_y_ata (from ATA)
+        const user2YAccountInfo = await connection.getParsedAccountInfo(user2_y_ata);
+        if (user2YAccountInfo.value && 'parsed' in user2YAccountInfo.value.data) {
+            const mintAddress = user2YAccountInfo.value.data.parsed.info.mint;
+            console.log("User2 Y ATA (from) mint:", mintAddress);
+        }
+
+
+        const ix = await program_normal.methods
+            .swap(
+                true,
+                new BN(amountSwapX),
+                new BN(amountSwapYMin),
+                new BN(Math.floor(new Date().getTime()/1000) + 600)
+            )
+                .accountsPartial({
+                    auth: auth_normal,
+                    user: user2.publicKey,
+                    mintX: mint_x,
+                    mintY: mint_y,
+                    userX: user2_x_ata,
+                    userY: user2_y_ata,
+                    vaultX: vault_x_ata_normal,
+                    vaultY: vault_y_ata_normal,
+                    config: config_normal,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+                    systemProgram: SystemProgram.programId
+                }).instruction();
+            
+        const txSignature = await buildTxConfirmOrLog(
+            user2,
+            ix,
+            program_normal,
+            "swap"
+          )
+        // try { 
+        //     tx2 = await program_normal.methods.swap(
+        //         true,
+        //         new BN(amountSwapX),
+        //         new BN(amountSwapYMin),
+        //         new BN(Math.floor(new Date().getTime()/1000) + 600)
+        //     )
+        //         .accountsPartial({
+        //             auth: auth_normal,
+        //             user: user2.publicKey,
+        //             mintX: mint_x,
+        //             mintY: mint_y,
+        //             userX: user2_x_ata,
+        //             userY: user2_y_ata,
+        //             vaultX: vault_x_ata_normal,
+        //             vaultY: vault_y_ata_normal,
+        //             config: config_normal,
+        //             tokenProgram: TOKEN_PROGRAM_ID,
+        //             associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        //             systemProgram: SystemProgram.programId
+        //         })
+        //         .signers([
+        //             user2
+        //         ]).rpc();
+        //     await confirmTx(tx2);
+        //     console.log("Your transaction signature", tx2);
+        // } catch (e) {
+        //     console.log("Error", e);
+        //     // Get and print logs for normal amm transaction
+        //     const normalLogs = await anchor.getProvider().connection.getTransaction(tx2, {
+        //         commitment: 'confirmed',
+        //         maxSupportedTransactionVersion: 0
+        //     });
+        //     console.log("Normal AMM transaction logs:");
+        //     normalLogs?.meta?.logMessages?.forEach(log => console.log(log));
+        // }
+
+        balances_user1 = await logBalances(user1.publicKey, "of user1 after swap", mint_x, mint_y);
+        balances_user2 = await logBalances(user2.publicKey, "of user2 after swap", mint_x, mint_y);
+        assert(balances_user1.balanceX.eq(balances_user2.balanceX), "User 1 should have equal X as user 2 after swap");
+        assert(balances_user1.balanceY.eq(balances_user2.balanceY), "User 1 should have equal Y as user 2 after swap");
     });
 });
-

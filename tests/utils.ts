@@ -114,3 +114,30 @@ export async function createAndFundATA(
 
     return ata;
 }
+
+export async function buildTxConfirmOrLog(signer:anchor.web3.Keypair, ix: anchor.web3.TransactionInstruction, program: any, operation: string | null) {
+    const tx = new anchor.web3.Transaction().add(ix);
+    const txSignature = await program.provider.connection.sendTransaction(
+        tx,
+        [signer],
+        { skipPreflight: true }
+    );
+    if (operation) {
+        console.log(`${operation} transaction signature:`, txSignature);
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const txDetails = await program.provider.connection.getTransaction(txSignature, {
+        maxSupportedTransactionVersion: 0,
+        commitment: "confirmed"
+    });
+    
+    if (txDetails?.meta?.err) {
+        console.log(txDetails);
+        const logs = txDetails?.meta?.logMessages || null;
+
+        if (logs) {
+        console.log(logs);
+        }
+        throw new Error(`Transaction failed: ${JSON.stringify(txDetails.meta.err)}`);
+    }   
+}
