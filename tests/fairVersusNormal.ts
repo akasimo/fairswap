@@ -64,9 +64,9 @@ describe("fairswap compared to regular amm", () => {
         initializer_y_ata = u2.ata;
 
         //user currently not used but creating for future tests
-        user1_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user1.publicKey, 50000);
+        user1_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user1.publicKey, 100000);
         user1_y_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_y, user1.publicKey, 0);
-        user2_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user2.publicKey, 50000);
+        user2_x_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_x, user2.publicKey, 100000);
         user2_y_ata = await createAndFundATA(anchor.getProvider().connection, initializer, mint_y, user2.publicKey, 0);
 
         // create config and lp mint for fairswap
@@ -352,5 +352,97 @@ describe("fairswap compared to regular amm", () => {
         balances_user2 = await logBalances(user2.publicKey, "of user2 after swap", mint_x, mint_y);
         assert(balances_user1.balanceX.eq(balances_user2.balanceX), "User 1 should have equal X as user 2 after swap");
         assert(balances_user1.balanceY.eq(balances_user2.balanceY), "User 1 should have equal Y as user 2 after swap");
+    });
+
+    it("Self MEV Attack", async () => {
+        // Log initial balances
+        let balances_user1_before = await logBalances(user1.publicKey, "of user1 before self MEV in fairswap", mint_x, mint_y);
+        let balances_user2_before = await logBalances(user2.publicKey, "of user2 before self MEV in normal amm", mint_x, mint_y);
+
+        // Self MEV attack on Fairswap for user1
+        const fairswapSwapAccounts = {
+            auth: auth_fairswap,
+            user: user1.publicKey,
+            mintX: mint_x,
+            mintY: mint_y,
+            userAtaX: user1_x_ata,
+            userAtaY: user1_y_ata,
+            vaultX: vault_x_ata_fairswap,
+            vaultY: vault_y_ata_fairswap,
+            config: config_fairswap,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+            systemProgram: SystemProgram.programId
+        };
+
+        const ix1 = await program_fairswap.methods.swap(mint_x, new BN(15000), new BN(1000))
+            .accountsPartial(fairswapSwapAccounts).instruction();
+        const ix2 = await program_fairswap.methods.swap(mint_x, new BN(15000), new BN(1000))
+            .accountsPartial(fairswapSwapAccounts).instruction();
+        const ix3 = await program_fairswap.methods.swap(mint_y, new BN(30000), new BN(1000))
+            .accountsPartial(fairswapSwapAccounts).instruction();
+
+        const fairswapTx = new anchor.web3.Transaction().add(ix1, ix2, ix3);
+        const fairswapTxSignature = await anchor.web3.sendAndConfirmTransaction(
+            program_fairswap.provider.connection,
+            fairswapTx,
+            [user1]
+        );
+        // console.log("Fairswap self MEV transaction signature", fairswapTxSignature);
+
+        // Self MEV attack on Normal AMM for user2
+        const normalSwapAccounts = {
+            auth: auth_normal,
+            user: user2.publicKey,
+            mintX: mint_x,
+            mintY: mint_y,
+            userX: user2_x_ata,
+            userY: user2_y_ata,
+            vaultX: vault_x_ata_normal,
+            vaultY: vault_y_ata_normal,
+            config: config_normal,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+            systemProgram: SystemProgram.programId
+        };
+
+        const currentTimestamp = Math.floor(new Date().getTime() / 1000);
+        const deadline = new BN(currentTimestamp + 600);
+
+        const ix4 = await program_normal.methods.swap(true, new BN(15000), new BN(1000), deadline)
+            .accountsPartial(normalSwapAccounts).instruction();
+        const ix5 = await program_normal.methods.swap(true, new BN(15000), new BN(1000), deadline)
+            .accountsPartial(normalSwapAccounts).instruction();
+        const ix6 = await program_normal.methods.swap(false, new BN(30000), new BN(1000), deadline)
+            .accountsPartial(normalSwapAccounts).instruction();
+
+        const normalTx = new anchor.web3.Transaction().add(ix4, ix5, ix6);
+        const normalTxSignature = await anchor.web3.sendAndConfirmTransaction(
+            program_normal.provider.connection,
+            normalTx,
+            [user2]
+        );
+        console.log("Normal AMM self MEV transaction signature", normalTxSignature);
+
+        // Log final balances and compare
+        let balances_user1_after = await logBalances(user1.publicKey, "of user1 after self MEV", mint_x, mint_y);
+        let balances_user2_after = await logBalances(user2.publicKey, "of user2 after self MEV", mint_x, mint_y);
+
+        // console.log("User1 (Fairswap) balance changes:");
+        // console.log(`X: ${balances_user1_after.balanceX.sub(balances_user1_before.balanceX)}`);
+        // console.log(`Y: ${balances_user1_after.balanceY.sub(balances_user1_before.balanceY)}`);
+
+        // console.log("User2 (Normal AMM) balance changes:");
+        // console.log(`X: ${balances_user2_after.balanceX.sub(balances_user2_before.balanceX)}`);
+        // console.log(`Y: ${balances_user2_after.balanceY.sub(balances_user2_before.balanceY)}`);
+
+        // You can add assertions here to compare the results if needed
+        // Assert that user1 (Fairswap) has less X than user2 (Normal AMM)
+        assert(balances_user1_after.balanceX.lt(balances_user2_after.balanceX), "User1 (Fairswap) should have less X than User2 (Normal AMM)");
+
+        // Calculate the difference in X balance
+        const xDifference = balances_user2_after.balanceX.sub(balances_user1_after.balanceX);
+
+        console.log(`User1 (Fairswap) has ${xDifference.toString()} less X tokens compared to User2 (Normal AMM) due to MEV protection.`);
     });
 });
