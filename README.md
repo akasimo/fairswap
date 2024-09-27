@@ -2,6 +2,9 @@
 
 FairSwap is a sandwich-resistant automated market maker (AMM) on the Solana blockchain, designed to protect traders from frontrunning attacks.
 
+Devnet deployment tx: https://explorer.solana.com/tx/FHitFo8tvz9jEq57WGCkX6vjDe3dBt9RpPrQGXJ9c7yGZz6ZyMEY37mceBxR49CgsMrFRjnRvFiMmWmpEQ9vbFg?cluster=devnet
+Devnet program: https://explorer.solana.com/address/69hNfSV6nw46VXAJ3ukAQhSXikKdX2L3nP4UkLDEMnrr?cluster=devnet
+
 ## Features
 
 - Sandwich-resistant trading

@@ -8,12 +8,15 @@ skip-lint = false
 fairswap = "69hNfSV6nw46VXAJ3ukAQhSXikKdX2L3nP4UkLDEMnrr"
 simple_amm = "A1X5VnxNAYpS4zGUsHA5s7rx625qeU8P5EnqnGHeU6jW"
 
+[programs.devnet]
+fairswap = "69hNfSV6nw46VXAJ3ukAQhSXikKdX2L3nP4UkLDEMnrr"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "~/.config/solana/id.json"
+wallet = "~/.config/solana/turbin_q3.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
